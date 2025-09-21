@@ -1,10 +1,9 @@
 # ClothingDetectorApp
 
-A sophisticated iOS app that uses AI to detect clothing items from photos and organize them in a digital closet.
+A helpful app that uses ML to detect clothing items from photos and organize them in a digital closet.
 
 ## Features
 
-- **AI-Powered Detection**: Uses Core ML and Vision framework to identify clothing type, material, and color
 - **Camera Integration**: Take photos directly in the app or select from photo library
 - **Digital Closet**: Store and organize your clothing items with metadata
 - **Smart Search**: Search through your closet by name, type, material, or color
@@ -23,7 +22,7 @@ A sophisticated iOS app that uses AI to detect clothing items from photos and or
 ### Data Models
 
 - **ClothingItem**: Core data model with type, material, color, and image
-- **ClothingType**: Comprehensive enum of clothing categories
+- **ClothingType**: Comprehensive list of clothing categories
 - **ClothingMaterial**: Fabric and material classification
 
 ## AI/ML Implementation
@@ -32,13 +31,13 @@ A sophisticated iOS app that uses AI to detect clothing items from photos and or
 
 The app currently uses a simplified approach for demonstration:
 
-1. **Type Detection**: Uses Vision framework with placeholder logic
+1. **Type Detection**: Uses Vision framework to detect shape
 2. **Color Analysis**: Dominant color extraction from pixel data
-3. **Material Prediction**: Basic texture analysis (placeholder)
+3. **Material Prediction**: Basic texture analysis 
 
 ### Production Improvements
 
-To make this production-ready, you'll need to:
+Still in progress
 
 1. **Train Custom Models**:
    ```bash
@@ -47,8 +46,6 @@ To make this production-ready, you'll need to:
    ```
 
 2. **Core ML Model Integration**:
-   - Replace placeholder model in `ClothingDetector.swift`
-   - Add actual `.mlmodel` files to the project
    - Train separate models for type, material, and advanced color analysis
 
 3. **Dataset Recommendations**:
