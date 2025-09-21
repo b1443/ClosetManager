@@ -7,7 +7,6 @@ struct CameraView: View {
     
     @State private var selectedImage: UIImage?
     @State private var showingImagePicker = false
-    @State private var showingCamera = false
     @State private var imageSource: ImageSource = .camera
     @State private var detectionResult: ClothingDetectionResult?
     @State private var isAnalyzing = false
@@ -81,7 +80,7 @@ struct CameraView: View {
                 HStack(spacing: 20) {
                     Button(action: {
                         imageSource = .camera
-                        showingCamera = true
+                        showingImagePicker = true
                     }) {
                         VStack {
                             Image(systemName: "camera")
@@ -167,9 +166,6 @@ struct CameraView: View {
         }
         .sheet(isPresented: $showingImagePicker) {
             ImagePicker(selectedImage: $selectedImage, sourceType: imageSource == .camera ? .camera : .photoLibrary)
-        }
-        .sheet(isPresented: $showingCamera) {
-            CameraPreview(capturedImage: $selectedImage, isPresented: $showingCamera)
         }
         .sheet(isPresented: $showingAddItemSheet) {
             AddItemSheet(
