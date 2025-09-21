@@ -10,18 +10,55 @@ struct ClothingItem: Identifiable, Codable {
     let dateAdded: Date
     let imageData: Data?
     
+    // Additional garment information
+    let brand: String?
+    let size: ClothingSize?
+    let purchasePrice: Double?
+    let purchaseDate: Date?
+    let store: String?
+    let season: Season?
+    let occasion: Occasion?
+    let notes: String?
+    let condition: Condition
+    let tags: [String]
+    
     var image: UIImage? {
         guard let imageData = imageData else { return nil }
         return UIImage(data: imageData)
     }
     
-    init(name: String, type: ClothingType, material: ClothingMaterial, color: String, image: UIImage? = nil) {
+    init(name: String, 
+         type: ClothingType, 
+         material: ClothingMaterial, 
+         color: String, 
+         image: UIImage? = nil,
+         brand: String? = nil,
+         size: ClothingSize? = nil,
+         purchasePrice: Double? = nil,
+         purchaseDate: Date? = nil,
+         store: String? = nil,
+         season: Season? = nil,
+         occasion: Occasion? = nil,
+         notes: String? = nil,
+         condition: Condition = .good,
+         tags: [String] = []) {
         self.name = name
         self.type = type
         self.material = material
         self.color = color
         self.dateAdded = Date()
         self.imageData = image?.jpegData(compressionQuality: 0.8)
+        
+        self.brand = brand
+        self.size = size
+        self.purchasePrice = purchasePrice
+        self.purchaseDate = purchaseDate
+        self.store = store
+        self.season = season
+        self.occasion = occasion
+        self.notes = notes
+        self.condition = condition
+        self.tags = tags
     }
 }
 
@@ -85,4 +122,124 @@ enum ClothingMaterial: String, CaseIterable, Codable {
     case flannel = "Flannel"
     case jersey = "Jersey"
     case unknown = "Unknown"
+}
+
+enum ClothingSize: String, CaseIterable, Codable {
+    // Letter sizes
+    case xxs = "XXS"
+    case xs = "XS"
+    case s = "S"
+    case m = "M"
+    case l = "L"
+    case xl = "XL"
+    case xxl = "XXL"
+    case xxxl = "XXXL"
+    
+    // Women's numeric sizes
+    case size00 = "00"
+    case size0 = "0"
+    case size2 = "2"
+    case size4 = "4"
+    case size6 = "6"
+    case size8 = "8"
+    case size10 = "10"
+    case size12 = "12"
+    case size14 = "14"
+    case size16 = "16"
+    case size18 = "18"
+    case size20 = "20"
+    
+    // Common shoe sizes
+    case shoe5 = "5 (shoe)"
+    case shoe5_5 = "5.5 (shoe)"
+    case shoe6 = "6 (shoe)"
+    case shoe6_5 = "6.5 (shoe)"
+    case shoe7 = "7 (shoe)"
+    case shoe7_5 = "7.5 (shoe)"
+    case shoe8 = "8 (shoe)"
+    case shoe8_5 = "8.5 (shoe)"
+    case shoe9 = "9 (shoe)"
+    case shoe9_5 = "9.5 (shoe)"
+    case shoe10 = "10 (shoe)"
+    case shoe10_5 = "10.5 (shoe)"
+    case shoe11 = "11 (shoe)"
+    case shoe11_5 = "11.5 (shoe)"
+    case shoe12 = "12 (shoe)"
+    
+    case oneSize = "One Size"
+    case custom = "Custom"
+}
+
+enum Season: String, CaseIterable, Codable {
+    case spring = "Spring"
+    case summer = "Summer"
+    case fall = "Fall"
+    case winter = "Winter"
+    case allSeason = "All Season"
+    
+    var icon: String {
+        switch self {
+        case .spring: return "🌸"
+        case .summer: return "☀️"
+        case .fall: return "🍂"
+        case .winter: return "❄️"
+        case .allSeason: return "🌍"
+        }
+    }
+}
+
+enum Occasion: String, CaseIterable, Codable {
+    case casual = "Casual"
+    case work = "Work"
+    case formal = "Formal"
+    case party = "Party"
+    case sport = "Sport"
+    case sleep = "Sleep"
+    case beach = "Beach"
+    case travel = "Travel"
+    case date = "Date"
+    case wedding = "Wedding"
+    
+    var icon: String {
+        switch self {
+        case .casual: return "👕"
+        case .work: return "💼"
+        case .formal: return "🤵"
+        case .party: return "🎉"
+        case .sport: return "🏃"
+        case .sleep: return "🛌"
+        case .beach: return "🏖️"
+        case .travel: return "✈️"
+        case .date: return "💕"
+        case .wedding: return "💒"
+        }
+    }
+}
+
+enum Condition: String, CaseIterable, Codable {
+    case new = "New"
+    case excellent = "Excellent"
+    case good = "Good"
+    case fair = "Fair"
+    case poor = "Poor"
+    
+    var icon: String {
+        switch self {
+        case .new: return "✨"
+        case .excellent: return "⭐"
+        case .good: return "👍"
+        case .fair: return "👌"
+        case .poor: return "👎"
+        }
+    }
+    
+    var color: String {
+        switch self {
+        case .new: return "green"
+        case .excellent: return "blue"
+        case .good: return "orange"
+        case .fair: return "yellow"
+        case .poor: return "red"
+        }
+    }
 }

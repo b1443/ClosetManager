@@ -3,9 +3,12 @@ import SwiftUI
 
 class ClosetManager: ObservableObject {
     @Published var clothingItems: [ClothingItem] = []
+    @Published var showingUndoMessage = false
     
     private let userDefaults = UserDefaults.standard
     private let clothingItemsKey = "ClothingItems"
+    private var recentlyDeletedItems: [(item: ClothingItem, index: Int)] = []
+    private var undoTimer: Timer?
     
     init() {
         loadClothingItems()
@@ -22,8 +25,20 @@ class ClosetManager: ObservableObject {
     }
     
     func removeClothingItems(at offsets: IndexSet) {
-        clothingItems.remove(atOffsets: offsets)
+        // Store deleted items for undo functionality
+        recentlyDeletedItems.removeAll()
+        
+        for index in offsets.sorted(by: >) {
+            let item = clothingItems[index]
+            recentlyDeletedItems.append((item: item, index: index))
+            clothingItems.remove(at: index)
+        }
+        
         saveClothingItems()
+        
+        // Show undo option
+        showingUndoMessage = true
+        
     }
     
     func getClothingItems(by type: ClothingType? = nil) -> [ClothingItem] {
@@ -112,14 +127,92 @@ class ClosetManager: ObservableObject {
     private func loadSampleData() {
         // Add some sample clothing items for demonstration
         let sampleItems = [
-            ClothingItem(name: "Blue Denim Jeans", type: .jeans, material: .denim, color: "Blue"),
-            ClothingItem(name: "White Cotton T-Shirt", type: .tShirt, material: .cotton, color: "White"),
-            ClothingItem(name: "Black Wool Sweater", type: .sweater, material: .wool, color: "Black"),
-            ClothingItem(name: "Red Silk Blouse", type: .blouse, material: .silk, color: "Red"),
-            ClothingItem(name: "Gray Polyester Jacket", type: .jacket, material: .polyester, color: "Gray")
+            ClothingItem(
+                name: "Blue Denim Jeans", 
+                type: .jeans, 
+                material: .denim, 
+                color: "Blue",
+                brand: "Levi's",
+                size: .m,
+                purchasePrice: 89.99,
+                store: "Macy's",
+                season: .allSeason,
+                occasion: .casual,
+                condition: .good,
+                tags: ["casual", "everyday"]
+            ),
+            ClothingItem(
+                name: "White Cotton T-Shirt", 
+                type: .tShirt, 
+                material: .cotton, 
+                color: "White",
+                brand: "Gap",
+                size: .m,
+                purchasePrice: 19.99,
+                store: "Gap",
+                season: .summer,
+                occasion: .casual,
+                condition: .excellent,
+                tags: ["basic", "summer"]
+            ),
+            ClothingItem(
+                name: "Black Wool Sweater", 
+                type: .sweater, 
+                material: .wool, 
+                color: "Black",
+                brand: "J.Crew",
+                size: .l,
+                purchasePrice: 120.00,
+                store: "J.Crew",
+                season: .winter,
+                occasion: .work,
+                condition: .good,
+                tags: ["warm", "professional"]
+            ),
+            ClothingItem(
+                name: "Red Silk Blouse", 
+                type: .blouse, 
+                material: .silk, 
+                color: "Red",
+                brand: "Banana Republic",
+                size: .s,
+                purchasePrice: 85.00,
+                store: "Banana Republic",
+                season: .spring,
+                occasion: .work,
+                condition: .excellent,
+                tags: ["elegant", "office"]
+            ),
+            ClothingItem(
+                name: "Gray Polyester Jacket", 
+                type: .jacket, 
+                material: .polyester, 
+                color: "Gray",
+                brand: "Nike",
+                size: .m,
+                purchasePrice: 95.50,
+                store: "Nike Store",
+                season: .fall,
+                occasion: .sport,
+                condition: .good,
+                tags: ["athletic", "outdoor"]
+            )
         ]
         
         clothingItems = sampleItems
+        saveClothingItems()
+    }
+    
+    func undoDelete() {
+        // Restore recently deleted items
+        for (item, index) in recentlyDeletedItems.sorted(by: { $0.index < $1.index }) {
+            let insertIndex = min(index, clothingItems.count)
+            clothingItems.insert(item, at: insertIndex)
+        }
+        
+        recentlyDeletedItems.removeAll()
+        showingUndoMessage = false
+        undoTimer?.invalidate()
         saveClothingItems()
     }
     

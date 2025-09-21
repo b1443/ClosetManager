@@ -159,6 +159,33 @@ struct ClosetView: View {
         .sheet(item: $selectedItem) { item in
             ClothingDetailView(item: item)
         }
+        .overlay(
+            // Undo notification
+            VStack {
+                Spacer()
+                
+                if closetManager.showingUndoMessage {
+                    HStack {
+                        Text("Item(s) deleted")
+                            .foregroundColor(.white)
+                        
+                        Spacer()
+                        
+                        Button("Undo") {
+                            closetManager.undoDelete()
+                        }
+                        .foregroundColor(.yellow)
+                        .fontWeight(.semibold)
+                    }
+                    .padding()
+                    .background(Color.black.opacity(0.8))
+                    .cornerRadius(10)
+                    .padding()
+                    .transition(.move(edge: .bottom).combined(with: .opacity))
+                }
+            }
+            .animation(.easeInOut(duration: 0.3), value: closetManager.showingUndoMessage)
+        )
     }
     
     private func shareClosetData() {
@@ -200,6 +227,13 @@ struct ClothingItemRow: View {
                     .font(.headline)
                     .lineLimit(1)
                 
+                if let brand = item.brand {
+                    Text(brand)
+                        .font(.subheadline)
+                        .foregroundColor(.secondary)
+                        .lineLimit(1)
+                }
+                
                 HStack {
                     Text(item.type.rawValue)
                         .font(.caption)
@@ -216,11 +250,32 @@ struct ClothingItemRow: View {
                         .background(Color.green.opacity(0.2))
                         .foregroundColor(.green)
                         .cornerRadius(4)
+                    
+                    if let size = item.size {
+                        Text(size.rawValue)
+                            .font(.caption)
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 2)
+                            .background(Color.orange.opacity(0.2))
+                            .foregroundColor(.orange)
+                            .cornerRadius(4)
+                    }
                 }
                 
-                Text(item.color)
-                    .font(.subheadline)
-                    .foregroundColor(.secondary)
+                HStack {
+                    Text(item.color)
+                        .font(.subheadline)
+                        .foregroundColor(.secondary)
+                    
+                    Spacer()
+                    
+                    if let price = item.purchasePrice, price > 0 {
+                        Text(String(format: "$%.0f", price))
+                            .font(.subheadline)
+                            .foregroundColor(.green)
+                            .fontWeight(.medium)
+                    }
+                }
             }
             
             Spacer()
@@ -378,12 +433,125 @@ struct ClothingDetailView: View {
                             .font(.largeTitle)
                             .fontWeight(.bold)
                         
+                        // Basic Information
                         VStack(alignment: .leading, spacing: 10) {
                             DetailRow(title: "Type", value: item.type.rawValue, icon: "tag")
                             DetailRow(title: "Material", value: item.material.rawValue, icon: "textformat")
                             DetailRow(title: "Color", value: item.color, icon: "paintbrush")
-                            DetailRow(title: "Added", value: DateFormatter.longDate.string(from: item.dateAdded), icon: "calendar")
+                            
+                            if let brand = item.brand {
+                                DetailRow(title: "Brand", value: brand, icon: "building.2")
+                            }
+                            
+                            if let size = item.size {
+                                DetailRow(title: "Size", value: size.rawValue, icon: "ruler")
+                            }
+                            
+                            DetailRow(title: "Condition", value: "\(item.condition.icon) \(item.condition.rawValue)", icon: "checkmark.seal")
                         }
+                    }
+                    .padding()
+                    .background(Color(.systemGray6))
+                    .cornerRadius(15)
+                    
+                    // Purchase Information
+                    if item.purchasePrice != nil || item.store != nil {
+                        VStack(alignment: .leading, spacing: 15) {
+                            Text("Purchase Information")
+                                .font(.headline)
+                                .fontWeight(.bold)
+                            
+                            VStack(alignment: .leading, spacing: 10) {
+                                if let price = item.purchasePrice, price > 0 {
+                                    DetailRow(title: "Price", value: String(format: "$%.2f", price), icon: "dollarsign.circle")
+                                }
+                                
+                                if let purchaseDate = item.purchaseDate {
+                                    DetailRow(title: "Purchase Date", value: DateFormatter.longDate.string(from: purchaseDate), icon: "calendar")
+                                }
+                                
+                                if let store = item.store {
+                                    DetailRow(title: "Store", value: store, icon: "bag")
+                                }
+                            }
+                        }
+                        .padding()
+                        .background(Color(.systemGray6))
+                        .cornerRadius(15)
+                    }
+                    
+                    // Category Information
+                    if item.season != nil || item.occasion != nil {
+                        VStack(alignment: .leading, spacing: 15) {
+                            Text("Category")
+                                .font(.headline)
+                                .fontWeight(.bold)
+                            
+                            VStack(alignment: .leading, spacing: 10) {
+                                if let season = item.season {
+                                    DetailRow(title: "Season", value: "\(season.icon) \(season.rawValue)", icon: "thermometer")
+                                }
+                                
+                                if let occasion = item.occasion {
+                                    DetailRow(title: "Occasion", value: "\(occasion.icon) \(occasion.rawValue)", icon: "person.3")
+                                }
+                            }
+                        }
+                        .padding()
+                        .background(Color(.systemGray6))
+                        .cornerRadius(15)
+                    }
+                    
+                    // Notes and Tags
+                    if item.notes != nil || !item.tags.isEmpty {
+                        VStack(alignment: .leading, spacing: 15) {
+                            Text("Additional Information")
+                                .font(.headline)
+                                .fontWeight(.bold)
+                            
+                            VStack(alignment: .leading, spacing: 10) {
+                                if let notes = item.notes {
+                                    DetailRow(title: "Notes", value: notes, icon: "note.text")
+                                }
+                                
+                                if !item.tags.isEmpty {
+                                    VStack(alignment: .leading, spacing: 5) {
+                                        HStack {
+                                            Image(systemName: "tag")
+                                                .foregroundColor(.blue)
+                                                .frame(width: 20)
+                                            Text("Tags:")
+                                                .fontWeight(.medium)
+                                            Spacer()
+                                        }
+                                        
+                                        LazyVGrid(columns: Array(repeating: GridItem(.flexible()), count: 3), spacing: 8) {
+                                            ForEach(item.tags, id: \.self) { tag in
+                                                Text(tag)
+                                                    .font(.caption)
+                                                    .padding(.horizontal, 8)
+                                                    .padding(.vertical, 4)
+                                                    .background(Color.blue.opacity(0.1))
+                                                    .foregroundColor(.blue)
+                                                    .cornerRadius(6)
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                        .padding()
+                        .background(Color(.systemGray6))
+                        .cornerRadius(15)
+                    }
+                    
+                    // Date Added
+                    VStack(alignment: .leading, spacing: 15) {
+                        Text("System Information")
+                            .font(.headline)
+                            .fontWeight(.bold)
+                        
+                        DetailRow(title: "Added", value: DateFormatter.longDate.string(from: item.dateAdded), icon: "calendar")
                     }
                     .padding()
                     .background(Color(.systemGray6))
