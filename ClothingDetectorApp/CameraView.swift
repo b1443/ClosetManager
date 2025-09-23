@@ -6,8 +6,8 @@ struct CameraView: View {
     @StateObject private var clothingDetector = ClothingDetector()
     
     @State private var selectedImage: UIImage?
-    @State private var showingImagePicker = false
-    @State private var imageSource: ImageSource = .camera
+    @State private var showingCameraPicker = false
+    @State private var showingPhotoLibraryPicker = false
     @State private var detectionResult: ClothingDetectionResult?
     @State private var isAnalyzing = false
     @State private var showingAddItemSheet = false
@@ -31,13 +31,11 @@ struct CameraView: View {
     @State private var errorMessage: String?
     @State private var showingError = false
     
-    enum ImageSource {
-        case camera, photoLibrary
-    }
     
     var body: some View {
         NavigationView {
-            VStack(spacing: 20) {
+            ScrollView {
+                VStack(spacing: 20) {
                 // Header
                 VStack {
                     Text("Add New Clothing")
@@ -104,8 +102,7 @@ struct CameraView: View {
                 // Action Buttons
                 HStack(spacing: 20) {
                     Button(action: {
-                        imageSource = .camera
-                        showingImagePicker = true
+                        showingCameraPicker = true
                     }) {
                         VStack {
                             Image(systemName: "camera")
@@ -121,8 +118,7 @@ struct CameraView: View {
                     }
                     
                     Button(action: {
-                        imageSource = .photoLibrary
-                        showingImagePicker = true
+                        showingPhotoLibraryPicker = true
                     }) {
                         VStack {
                             Image(systemName: "photo.on.rectangle")
@@ -181,8 +177,6 @@ struct CameraView: View {
                     .transition(.scale.combined(with: .opacity))
                 }
                 
-                Spacer()
-                
                 // Add to Closet Button
                 if selectedImage != nil && detectionResult != nil {
                     Button(action: {
@@ -199,12 +193,16 @@ struct CameraView: View {
                     }
                     .padding(.horizontal)
                 }
+                }
             }
             .navigationTitle("Camera")
             .navigationBarTitleDisplayMode(.inline)
         }
-        .sheet(isPresented: $showingImagePicker) {
-            ImagePicker(selectedImage: $selectedImage, sourceType: imageSource == .camera ? .camera : .photoLibrary)
+        .sheet(isPresented: $showingCameraPicker) {
+            ImagePicker(selectedImage: $selectedImage, sourceType: .camera)
+        }
+        .sheet(isPresented: $showingPhotoLibraryPicker) {
+            ImagePicker(selectedImage: $selectedImage, sourceType: .photoLibrary)
         }
         .sheet(isPresented: $showingAddItemSheet) {
             AddItemSheet(
