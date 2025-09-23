@@ -417,10 +417,10 @@ struct ClosetView: View {
             StatsSheet()
                 .environmentObject(closetManager)
         }
-        // .sheet(isPresented: $showingSettings) {
-        //     SettingsView()
-        //         .environmentObject(closetManager)
-        // }
+        .sheet(isPresented: $showingSettings) {
+            SettingsView()
+                .environmentObject(closetManager)
+        }
         .sheet(item: $selectedItem) { item in
             ClothingDetailView(item: item)
         }
