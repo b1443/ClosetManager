@@ -17,6 +17,8 @@
 		1D2E3F5E2C1234567890ABCD /* CameraView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1D2E3F5D2C1234567890ABCD /* CameraView.swift */; };
 		1D2E3F602C1234567890ABCD /* ClosetView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1D2E3F5F2C1234567890ABCD /* ClosetView.swift */; };
 		1D2E3F622C1234567890ABCD /* ImagePicker.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1D2E3F612C1234567890ABCD /* ImagePicker.swift */; };
+		3611F016E0804B25AC140722 /* DualImageCaptureView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A8F915E0E04C47148F3EAE18 /* DualImageCaptureView.swift */; };
+		951D9611117E47F299594D36 /* ImageEditingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3B30CB50322E4BF4AA6AADBE /* ImageEditingView.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -31,6 +33,8 @@
 		1D2E3F5D2C1234567890ABCD /* CameraView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CameraView.swift; sourceTree = "<group>"; };
 		1D2E3F5F2C1234567890ABCD /* ClosetView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClosetView.swift; sourceTree = "<group>"; };
 		1D2E3F612C1234567890ABCD /* ImagePicker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ImagePicker.swift; sourceTree = "<group>"; };
+		A8F915E0E04C47148F3EAE18 /* DualImageCaptureView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DualImageCaptureView.swift; sourceTree = "<group>"; };
+		3B30CB50322E4BF4AA6AADBE /* ImageEditingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ImageEditingView.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -68,6 +72,8 @@
 				1D2E3F5D2C1234567890ABCD /* CameraView.swift */,
 				1D2E3F5F2C1234567890ABCD /* ClosetView.swift */,
 				1D2E3F612C1234567890ABCD /* ImagePicker.swift */,
+				A8F915E0E04C47148F3EAE18 /* DualImageCaptureView.swift */,
+				3B30CB50322E4BF4AA6AADBE /* ImageEditingView.swift */,
 				1D2E3F572C1234567890ABCD /* ClothingItem.swift */,
 				1D2E3F592C1234567890ABCD /* ClothingDetector.swift */,
 				1D2E3F5B2C1234567890ABCD /* ClosetManager.swift */,
@@ -162,6 +168,8 @@
 				1D2E3F5E2C1234567890ABCD /* CameraView.swift in Sources */,
 				1D2E3F602C1234567890ABCD /* ClosetView.swift in Sources */,
 				1D2E3F622C1234567890ABCD /* ImagePicker.swift in Sources */,
+				3611F016E0804B25AC140722 /* DualImageCaptureView.swift in Sources */,
+				951D9611117E47F299594D36 /* ImageEditingView.swift in Sources */,
 				1D2E3F4A2C1234567890ABCD /* ClothingDetectorAppApp.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;

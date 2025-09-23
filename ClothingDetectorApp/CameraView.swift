@@ -6,8 +6,11 @@ struct CameraView: View {
     @StateObject private var clothingDetector = ClothingDetector()
     
     @State private var selectedImage: UIImage?
+    @State private var frontImage: UIImage?
+    @State private var backImage: UIImage?
     @State private var showingCameraPicker = false
     @State private var showingPhotoLibraryPicker = false
+    @State private var showingDualImageCapture = false
     @State private var detectionResult: ClothingDetectionResult?
     @State private var isAnalyzing = false
     @State private var showingAddItemSheet = false
@@ -36,163 +39,29 @@ struct CameraView: View {
         NavigationView {
             ScrollView {
                 VStack(spacing: 20) {
-                // Header
-                VStack {
-                    Text("Add New Clothing")
-                        .font(.largeTitle)
-                        .fontWeight(.bold)
-                    
-                    Text("Take a photo or select from library to detect clothing details")
-                        .font(.subheadline)
-                        .foregroundColor(.secondary)
-                        .multilineTextAlignment(.center)
-                }
-                .padding(.top)
+                    HeaderView()
+                    ImageDisplayView(selectedImage: selectedImage, isAnalyzing: isAnalyzing)
                 
-                // Image Display
-                ZStack {
-                    RoundedRectangle(cornerRadius: 15)
-                        .fill(Color(.systemGray6))
-                        .frame(height: 300)
-                        .overlay(
-                            Group {
-                                if let image = selectedImage {
-                                    Image(uiImage: image)
-                                        .resizable()
-                                        .aspectRatio(contentMode: .fit)
-                                        .cornerRadius(15)
-                                } else {
-                                    VStack {
-                                        Image(systemName: "camera.fill")
-                                            .font(.system(size: 50))
-                                            .foregroundColor(.gray)
-                                        Text("No image selected")
-                                            .foregroundColor(.gray)
-                                    }
-                                }
-                            }
-                        )
-                    
-                    if isAnalyzing {
-                        Color.black.opacity(0.4)
-                            .cornerRadius(15)
-                        
-                        VStack(spacing: 16) {
-                            ProgressView()
-                                .progressViewStyle(CircularProgressViewStyle(tint: .white))
-                                .scaleEffect(1.8)
-                            
-                            VStack(spacing: 4) {
-                                Text("Analyzing clothing...")
-                                    .foregroundColor(.white)
-                                    .fontWeight(.semibold)
-                                    .font(.headline)
-                                
-                                Text("Using AI to detect type, material & color")
-                                    .foregroundColor(.white.opacity(0.8))
-                                    .font(.caption)
-                                    .multilineTextAlignment(.center)
-                            }
-                        }
-                        .transition(.opacity.combined(with: .scale))
-                    }
-                }
-                .padding(.horizontal)
-                
-                // Action Buttons
-                HStack(spacing: 20) {
-                    Button(action: {
-                        showingCameraPicker = true
-                    }) {
-                        VStack {
-                            Image(systemName: "camera")
-                                .font(.title2)
-                            Text("Camera")
-                                .font(.caption)
-                        }
-                        .frame(maxWidth: .infinity)
-                        .padding()
-                        .background(Color.blue)
-                        .foregroundColor(.white)
-                        .cornerRadius(10)
-                    }
-                    
-                    Button(action: {
-                        showingPhotoLibraryPicker = true
-                    }) {
-                        VStack {
-                            Image(systemName: "photo.on.rectangle")
-                                .font(.title2)
-                            Text("Photos")
-                                .font(.caption)
-                        }
-                        .frame(maxWidth: .infinity)
-                        .padding()
-                        .background(Color.green)
-                        .foregroundColor(.white)
-                        .cornerRadius(10)
-                    }
-                }
-                .padding(.horizontal)
-                
-                // Detection Results
-                if let result = detectionResult {
-                    VStack(alignment: .leading, spacing: 12) {
-                        HStack {
-                            Image(systemName: "checkmark.circle.fill")
-                                .foregroundColor(.green)
-                                .font(.title3)
-                            Text("Analysis Complete")
-                                .font(.headline)
-                                .fontWeight(.semibold)
-                        }
-                        
-                        VStack(spacing: 8) {
-                            ResultRow(title: "Type", value: result.type.rawValue, icon: "tag", confidence: result.confidence)
-                            ResultRow(title: "Material", value: result.material.rawValue, icon: "textformat", confidence: result.confidence)
-                            ResultRow(title: "Color", value: result.color, icon: "paintbrush", confidence: result.confidence)
-                            
-                            // Confidence indicator
-                            HStack {
-                                Image(systemName: "gauge")
-                                    .foregroundColor(.blue)
-                                Text("Confidence: \(Int(result.confidence * 100))%")
-                                    .fontWeight(.medium)
-                                Spacer()
-                                ConfidenceIndicator(confidence: result.confidence)
-                            }
-                            .font(.subheadline)
-                        }
-                    }
-                    .padding()
-                    .background(
-                        LinearGradient(
-                            gradient: Gradient(colors: [Color(.systemGray6), Color(.systemGray6).opacity(0.7)]),
-                            startPoint: .top,
-                            endPoint: .bottom
-                        )
+                    ActionButtonsView(
+                        showingDualImageCapture: $showingDualImageCapture,
+                        showingCameraPicker: $showingCameraPicker,
+                        showingPhotoLibraryPicker: $showingPhotoLibraryPicker
                     )
-                    .cornerRadius(12)
-                    .padding(.horizontal)
-                    .transition(.scale.combined(with: .opacity))
-                }
                 
-                // Add to Closet Button
-                if selectedImage != nil && detectionResult != nil {
-                    Button(action: {
-                        setupAddItemSheet()
-                        showingAddItemSheet = true
-                    }) {
-                        Text("Add to Closet")
-                            .font(.headline)
-                            .foregroundColor(.white)
-                            .frame(maxWidth: .infinity)
-                            .padding()
-                            .background(Color.blue)
-                            .cornerRadius(10)
+                    if let result = detectionResult {
+                        DetectionResultsView(result: result)
                     }
-                    .padding(.horizontal)
-                }
+                
+                    if frontImage != nil || backImage != nil {
+                        DualImagesDisplayView(frontImage: frontImage, backImage: backImage)
+                    }
+                
+                    if (selectedImage != nil && detectionResult != nil) || frontImage != nil {
+                        AddToClosetButton {
+                            setupAddItemSheet()
+                            showingAddItemSheet = true
+                        }
+                    }
                 }
             }
             .navigationTitle("Camera")
@@ -204,9 +73,17 @@ struct CameraView: View {
         .sheet(isPresented: $showingPhotoLibraryPicker) {
             ImagePicker(selectedImage: $selectedImage, sourceType: .photoLibrary)
         }
+        .sheet(isPresented: $showingDualImageCapture) {
+            DualImageCaptureView(
+                frontImage: $frontImage,
+                backImage: $backImage
+            )
+        }
         .sheet(isPresented: $showingAddItemSheet) {
             AddItemSheet(
                 image: selectedImage,
+                frontImage: frontImage,
+                backImage: backImage,
                 detectionResult: detectionResult,
                 customItemName: $customItemName,
                 selectedType: $selectedType,
@@ -230,6 +107,13 @@ struct CameraView: View {
         }
         .onChange(of: selectedImage) { oldValue, newValue in
             if let newValue = newValue {
+                analyzeImage(newValue)
+            }
+        }
+        .onChange(of: frontImage) { oldValue, newValue in
+            if let newValue = newValue {
+                // Prioritize front image for AI analysis
+                selectedImage = newValue
                 analyzeImage(newValue)
             }
         }
@@ -302,6 +186,8 @@ struct CameraView: View {
     
     private func resetForm() {
         selectedImage = nil
+        frontImage = nil
+        backImage = nil
         detectionResult = nil
         customItemName = ""
         selectedType = .unknown
@@ -324,6 +210,8 @@ struct CameraView: View {
 
 struct AddItemSheet: View {
     let image: UIImage?
+    let frontImage: UIImage?
+    let backImage: UIImage?
     let detectionResult: ClothingDetectionResult?
     
     @Binding var customItemName: String
@@ -431,16 +319,23 @@ struct AddItemSheet: View {
                 }
                 
                 // Photo Preview
-                if let image = image {
-                    Section(header: Text("Photo")) {
-                        HStack {
-                            Spacer()
-                            Image(uiImage: image)
-                                .resizable()
-                                .aspectRatio(contentMode: .fit)
-                                .frame(maxHeight: 150)
-                                .cornerRadius(10)
-                            Spacer()
+                if frontImage != nil || backImage != nil || image != nil {
+                    Section(header: Text("Photos")) {
+                        HStack(spacing: 12) {
+                            if let front = frontImage ?? image {
+                                Image(uiImage: front)
+                                    .resizable()
+                                    .aspectRatio(contentMode: .fit)
+                                    .frame(maxHeight: 120)
+                                    .cornerRadius(10)
+                            }
+                            if let back = backImage {
+                                Image(uiImage: back)
+                                    .resizable()
+                                    .aspectRatio(contentMode: .fit)
+                                    .frame(maxHeight: 120)
+                                    .cornerRadius(10)
+                            }
                         }
                     }
                 }
@@ -460,7 +355,8 @@ struct AddItemSheet: View {
                         type: selectedType,
                         material: selectedMaterial,
                         color: selectedColor.isEmpty ? "Unknown" : selectedColor,
-                        image: image,
+                        frontImage: frontImage ?? image,
+                        backImage: backImage,
                         brand: selectedBrand.isEmpty ? nil : selectedBrand,
                         size: selectedSize,
                         purchasePrice: priceValue,
@@ -514,6 +410,314 @@ struct ConfidenceIndicator: View {
                     .frame(width: 8, height: 8)
             }
         }
+    }
+}
+
+// MARK: - Helper Views
+struct HeaderView: View {
+    var body: some View {
+        VStack {
+            Text("Add New Clothing")
+                .font(.largeTitle)
+                .fontWeight(.bold)
+            
+            Text("Take a photo or select from library to detect clothing details")
+                .font(.subheadline)
+                .foregroundColor(.secondary)
+                .multilineTextAlignment(.center)
+        }
+        .padding(.top)
+    }
+}
+
+struct ImageDisplayView: View {
+    let selectedImage: UIImage?
+    let isAnalyzing: Bool
+    
+    var body: some View {
+        ZStack {
+            RoundedRectangle(cornerRadius: 15)
+                .fill(Color(.systemGray6))
+                .frame(height: 300)
+                .overlay(
+                    Group {
+                        if let image = selectedImage {
+                            Image(uiImage: image)
+                                .resizable()
+                                .aspectRatio(contentMode: .fit)
+                                .cornerRadius(15)
+                        } else {
+                            VStack {
+                                Image(systemName: "camera.fill")
+                                    .font(.system(size: 50))
+                                    .foregroundColor(.gray)
+                                Text("No image selected")
+                                    .foregroundColor(.gray)
+                            }
+                        }
+                    }
+                )
+            
+            if isAnalyzing {
+                Color.black.opacity(0.4)
+                    .cornerRadius(15)
+                
+                VStack(spacing: 16) {
+                    ProgressView()
+                        .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                        .scaleEffect(1.8)
+                    
+                    VStack(spacing: 4) {
+                        Text("Analyzing clothing...")
+                            .foregroundColor(.white)
+                            .fontWeight(.semibold)
+                            .font(.headline)
+                        
+                        Text("Using AI to detect type, material & color")
+                            .foregroundColor(.white.opacity(0.8))
+                            .font(.caption)
+                            .multilineTextAlignment(.center)
+                    }
+                }
+                .transition(.opacity.combined(with: .scale))
+            }
+        }
+        .padding(.horizontal)
+    }
+}
+
+struct ActionButtonsView: View {
+    @Binding var showingDualImageCapture: Bool
+    @Binding var showingCameraPicker: Bool
+    @Binding var showingPhotoLibraryPicker: Bool
+    
+    var body: some View {
+        VStack(spacing: 12) {
+            // Dual Image Capture
+            Button(action: {
+                showingDualImageCapture = true
+            }) {
+                HStack {
+                    Image(systemName: "camera.rotate")
+                        .font(.title2)
+                    VStack(alignment: .leading) {
+                        Text("Capture Front & Back")
+                            .font(.headline)
+                            .fontWeight(.semibold)
+                        Text("Recommended for best organization")
+                            .font(.caption)
+                    }
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding()
+                .background(Color.purple)
+                .foregroundColor(.white)
+                .cornerRadius(12)
+            }
+            
+            HStack(spacing: 12) {
+                Button(action: {
+                    showingCameraPicker = true
+                }) {
+                    VStack {
+                        Image(systemName: "camera")
+                            .font(.title2)
+                        Text("Camera")
+                            .font(.caption)
+                    }
+                    .frame(maxWidth: .infinity)
+                    .padding()
+                    .background(Color.blue)
+                    .foregroundColor(.white)
+                    .cornerRadius(10)
+                }
+                
+                Button(action: {
+                    showingPhotoLibraryPicker = true
+                }) {
+                    VStack {
+                        Image(systemName: "photo.on.rectangle")
+                            .font(.title2)
+                        Text("Photos")
+                            .font(.caption)
+                    }
+                    .frame(maxWidth: .infinity)
+                    .padding()
+                    .background(Color.green)
+                    .foregroundColor(.white)
+                    .cornerRadius(10)
+                }
+            }
+        }
+        .padding(.horizontal)
+    }
+}
+
+struct DetectionResultsView: View {
+    let result: ClothingDetectionResult
+    
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack {
+                Image(systemName: "checkmark.circle.fill")
+                    .foregroundColor(.green)
+                    .font(.title3)
+                Text("Analysis Complete")
+                    .font(.headline)
+                    .fontWeight(.semibold)
+            }
+            
+            VStack(spacing: 8) {
+                ResultRow(title: "Type", value: result.type.rawValue, icon: "tag", confidence: result.confidence)
+                ResultRow(title: "Material", value: result.material.rawValue, icon: "textformat", confidence: result.confidence)
+                ResultRow(title: "Color", value: result.color, icon: "paintbrush", confidence: result.confidence)
+                
+                // Confidence indicator
+                HStack {
+                    Image(systemName: "gauge")
+                        .foregroundColor(.blue)
+                    Text("Confidence: \(Int(result.confidence * 100))%")
+                        .fontWeight(.medium)
+                    Spacer()
+                    ConfidenceIndicator(confidence: result.confidence)
+                }
+                .font(.subheadline)
+            }
+        }
+        .padding()
+        .background(
+            LinearGradient(
+                gradient: Gradient(colors: [Color(.systemGray6), Color(.systemGray6).opacity(0.7)]),
+                startPoint: .top,
+                endPoint: .bottom
+            )
+        )
+        .cornerRadius(12)
+        .padding(.horizontal)
+        .transition(.scale.combined(with: .opacity))
+    }
+}
+
+struct DualImagesDisplayView: View {
+    let frontImage: UIImage?
+    let backImage: UIImage?
+    
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack {
+                Image(systemName: "photo.on.rectangle.angled")
+                    .foregroundColor(.purple)
+                    .font(.title3)
+                Text("Captured Images")
+                    .font(.headline)
+                    .fontWeight(.semibold)
+            }
+            
+            HStack(spacing: 16) {
+                // Front Image
+                VStack {
+                    if let frontImage = frontImage {
+                        Image(uiImage: frontImage)
+                            .resizable()
+                            .aspectRatio(contentMode: .fill)
+                            .frame(width: 120, height: 120)
+                            .clipped()
+                            .cornerRadius(12)
+                            .overlay(
+                                Image(systemName: "checkmark.circle.fill")
+                                    .foregroundColor(.green)
+                                    .background(Color.white)
+                                    .clipShape(Circle())
+                                    .font(.caption)
+                                    .offset(x: 45, y: -45)
+                            )
+                    } else {
+                        RoundedRectangle(cornerRadius: 12)
+                            .fill(Color(.systemGray5))
+                            .frame(width: 120, height: 120)
+                            .overlay(
+                                VStack {
+                                    Image(systemName: "camera")
+                                        .font(.title2)
+                                        .foregroundColor(.gray)
+                                    Text("Front")
+                                        .font(.caption)
+                                        .foregroundColor(.gray)
+                                }
+                            )
+                    }
+                    Text("Front View")
+                        .font(.caption)
+                        .fontWeight(.medium)
+                }
+                
+                // Back Image
+                VStack {
+                    if let backImage = backImage {
+                        Image(uiImage: backImage)
+                            .resizable()
+                            .aspectRatio(contentMode: .fill)
+                            .frame(width: 120, height: 120)
+                            .clipped()
+                            .cornerRadius(12)
+                            .overlay(
+                                Image(systemName: "checkmark.circle.fill")
+                                    .foregroundColor(.green)
+                                    .background(Color.white)
+                                    .clipShape(Circle())
+                                    .font(.caption)
+                                    .offset(x: 45, y: -45)
+                            )
+                    } else {
+                        RoundedRectangle(cornerRadius: 12)
+                            .fill(Color(.systemGray5))
+                            .frame(width: 120, height: 120)
+                            .overlay(
+                                VStack {
+                                    Image(systemName: "camera.rotate")
+                                        .font(.title2)
+                                        .foregroundColor(.gray)
+                                    Text("Back")
+                                        .font(.caption)
+                                        .foregroundColor(.gray)
+                                }
+                            )
+                    }
+                    Text("Back View")
+                        .font(.caption)
+                        .fontWeight(.medium)
+                }
+                
+                Spacer()
+            }
+        }
+        .padding()
+        .background(
+            LinearGradient(
+                gradient: Gradient(colors: [Color(.systemGray6), Color(.systemGray6).opacity(0.7)]),
+                startPoint: .top,
+                endPoint: .bottom
+            )
+        )
+        .cornerRadius(12)
+        .padding(.horizontal)
+    }
+}
+
+struct AddToClosetButton: View {
+    let action: () -> Void
+    
+    var body: some View {
+        Button(action: action) {
+            Text("Add to Closet")
+                .font(.headline)
+                .foregroundColor(.white)
+                .frame(maxWidth: .infinity)
+                .padding()
+                .background(Color.blue)
+                .cornerRadius(10)
+        }
+        .padding(.horizontal)
     }
 }
 

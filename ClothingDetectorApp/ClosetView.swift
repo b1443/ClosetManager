@@ -658,22 +658,55 @@ struct ClothingItemRow: View {
             }
             
             // Image or placeholder
-            Group {
-                if let image = item.image {
-                    Image(uiImage: image)
-                        .resizable()
-                        .aspectRatio(contentMode: .fill)
-                } else {
-                    Rectangle()
-                        .fill(Color(.systemGray5))
-                        .overlay(
-                            Text(item.type.icon)
-                                .font(.title)
-                        )
+            ZStack {
+                Group {
+                    if let image = item.frontImage {
+                        Image(uiImage: image)
+                            .resizable()
+                            .aspectRatio(contentMode: .fill)
+                    } else {
+                        Rectangle()
+                            .fill(Color(.systemGray5))
+                            .overlay(
+                                Text(item.type.icon)
+                                    .font(.title)
+                            )
+                    }
+                }
+                .frame(width: 60, height: 60)
+                .clipShape(RoundedRectangle(cornerRadius: 8))
+                
+                // Dual image indicator
+                if item.hasBothImages {
+                    VStack {
+                        HStack {
+                            Spacer()
+                            Image(systemName: "photo.on.rectangle.angled")
+                                .font(.caption2)
+                                .foregroundColor(.white)
+                                .padding(2)
+                                .background(Color.purple)
+                                .clipShape(Circle())
+                        }
+                        Spacer()
+                    }
+                    .frame(width: 60, height: 60)
+                } else if item.hasImages {
+                    VStack {
+                        HStack {
+                            Spacer()
+                            Image(systemName: "photo")
+                                .font(.caption2)
+                                .foregroundColor(.white)
+                                .padding(2)
+                                .background(Color.blue)
+                                .clipShape(Circle())
+                        }
+                        Spacer()
+                    }
+                    .frame(width: 60, height: 60)
                 }
             }
-            .frame(width: 60, height: 60)
-            .clipShape(RoundedRectangle(cornerRadius: 8))
             
             VStack(alignment: .leading, spacing: 4) {
                 Text(item.name)
@@ -1100,18 +1133,108 @@ struct StatsSheet: View {
 struct ClothingDetailView: View {
     let item: ClothingItem
     @Environment(\.presentationMode) var presentationMode
+    @State private var selectedImageIndex = 0
+    @State private var showingFullScreenImage = false
+    
+    private var availableImages: [UIImage] {
+        var images: [UIImage] = []
+        if let frontImage = item.frontImage {
+            images.append(frontImage)
+        }
+        if let backImage = item.backImage {
+            images.append(backImage)
+        }
+        return images
+    }
+    
+    private var imageLabels: [String] {
+        var labels: [String] = []
+        if item.frontImage != nil {
+            labels.append("Front View")
+        }
+        if item.backImage != nil {
+            labels.append("Back View")
+        }
+        return labels
+    }
     
     var body: some View {
         NavigationView {
             ScrollView {
                 VStack(alignment: .leading, spacing: 20) {
-                    // Image
-                    if let image = item.image {
-                        Image(uiImage: image)
-                            .resizable()
-                            .aspectRatio(contentMode: .fit)
-                            .frame(maxHeight: 300)
-                            .cornerRadius(15)
+                    // Images Section
+                    if !availableImages.isEmpty {
+                        VStack(spacing: 12) {
+                            // Main Image Display
+                            ZStack {
+                                Image(uiImage: availableImages[selectedImageIndex])
+                                    .resizable()
+                                    .aspectRatio(contentMode: .fit)
+                                    .frame(maxHeight: 300)
+                                    .cornerRadius(15)
+                                    .onTapGesture {
+                                        showingFullScreenImage = true
+                                    }
+                                
+                                // Image counter overlay
+                                if availableImages.count > 1 {
+                                    VStack {
+                                        HStack {
+                                            Spacer()
+                                            Text("\(selectedImageIndex + 1)/\(availableImages.count)")
+                                                .font(.caption)
+                                                .foregroundColor(.white)
+                                                .padding(.horizontal, 8)
+                                                .padding(.vertical, 4)
+                                                .background(Color.black.opacity(0.6))
+                                                .cornerRadius(12)
+                                                .padding(.trailing)
+                                        }
+                                        Spacer()
+                                    }
+                                    .padding(.top)
+                                }
+                            }
+                            
+                            // Image Type Label
+                            if availableImages.count > 0 {
+                                Text(imageLabels[selectedImageIndex])
+                                    .font(.headline)
+                                    .foregroundColor(.secondary)
+                                    .frame(maxWidth: .infinity, alignment: .center)
+                            }
+                            
+                            // Image Navigation
+                            if availableImages.count > 1 {
+                                HStack(spacing: 20) {
+                                    ForEach(0..<availableImages.count, id: \.self) { index in
+                                        Button(action: {
+                                            withAnimation(.easeInOut(duration: 0.3)) {
+                                                selectedImageIndex = index
+                                            }
+                                        }) {
+                                            VStack {
+                                                Image(uiImage: availableImages[index])
+                                                    .resizable()
+                                                    .aspectRatio(contentMode: .fill)
+                                                    .frame(width: 60, height: 60)
+                                                    .clipShape(RoundedRectangle(cornerRadius: 8))
+                                                    .overlay(
+                                                        RoundedRectangle(cornerRadius: 8)
+                                                            .stroke(selectedImageIndex == index ? Color.blue : Color.clear, lineWidth: 3)
+                                                    )
+                                                
+                                                Text(imageLabels[index])
+                                                    .font(.caption)
+                                                    .foregroundColor(selectedImageIndex == index ? .blue : .secondary)
+                                            }
+                                        }
+                                        .buttonStyle(PlainButtonStyle())
+                                    }
+                                }
+                                .padding(.horizontal)
+                            }
+                        }
                     } else {
                         Rectangle()
                             .fill(Color(.systemGray5))
@@ -1120,7 +1243,7 @@ struct ClothingDetailView: View {
                                 VStack {
                                     Text(item.type.icon)
                                         .font(.system(size: 80))
-                                    Text("No Image")
+                                    Text("No Images")
                                         .font(.headline)
                                         .foregroundColor(.secondary)
                                 }
@@ -1269,6 +1392,140 @@ struct ClothingDetailView: View {
                     presentationMode.wrappedValue.dismiss()
                 }
             )
+        }
+        .fullScreenCover(isPresented: $showingFullScreenImage) {
+            FullScreenImageViewer(
+                images: availableImages,
+                imageLabels: imageLabels,
+                initialIndex: selectedImageIndex
+            )
+        }
+    }
+}
+
+struct FullScreenImageViewer: View {
+    let images: [UIImage]
+    let imageLabels: [String]
+    let initialIndex: Int
+    
+    @Environment(\.presentationMode) var presentationMode
+    @State private var currentIndex: Int
+    @State private var scale: CGFloat = 1.0
+    @State private var lastScale: CGFloat = 1.0
+    @State private var offset: CGSize = .zero
+    @State private var lastOffset: CGSize = .zero
+    
+    init(images: [UIImage], imageLabels: [String], initialIndex: Int) {
+        self.images = images
+        self.imageLabels = imageLabels
+        self.initialIndex = initialIndex
+        _currentIndex = State(initialValue: min(max(0, initialIndex), images.count - 1))
+    }
+    
+    var body: some View {
+        ZStack {
+            Color.black.edgesIgnoringSafeArea(.all)
+            
+            if !images.isEmpty {
+                GeometryReader { geometry in
+                    let image = images[currentIndex]
+                    
+                    Image(uiImage: image)
+                        .resizable()
+                        .aspectRatio(contentMode: .fit)
+                        .scaleEffect(scale)
+                        .offset(offset)
+                        .gesture(
+                            MagnificationGesture()
+                                .onChanged { value in
+                                    scale = lastScale * value
+                                }
+                                .onEnded { _ in
+                                    lastScale = max(1.0, min(scale, 3.0))
+                                    scale = lastScale
+                                }
+                        )
+                        .gesture(
+                            DragGesture()
+                                .onChanged { value in
+                                    offset = CGSize(width: lastOffset.width + value.translation.width, height: lastOffset.height + value.translation.height)
+                                }
+                                .onEnded { _ in
+                                    lastOffset = offset
+                                }
+                        )
+                        .onTapGesture(count: 2) {
+                            withAnimation(.easeInOut) {
+                                if scale > 1.0 {
+                                    scale = 1.0
+                                    lastScale = 1.0
+                                    offset = .zero
+                                    lastOffset = .zero
+                                } else {
+                                    scale = 2.0
+                                    lastScale = 2.0
+                                }
+                            }
+                        }
+                        .frame(width: geometry.size.width, height: geometry.size.height)
+                }
+            }
+            
+            VStack {
+                HStack {
+                    Button(action: { presentationMode.wrappedValue.dismiss() }) {
+                        Image(systemName: "xmark")
+                            .foregroundColor(.white)
+                            .padding(10)
+                            .background(Color.black.opacity(0.6))
+                            .clipShape(Circle())
+                    }
+                    
+                    Spacer()
+                    
+                    if images.count > 1 {
+                        Text(imageLabels[currentIndex])
+                            .foregroundColor(.white)
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 6)
+                            .background(Color.black.opacity(0.6))
+                            .cornerRadius(12)
+                    }
+                }
+                .padding()
+                
+                Spacer()
+                
+                if images.count > 1 {
+                    HStack {
+                        Button(action: { withAnimation { currentIndex = max(0, currentIndex - 1) } }) {
+                            Image(systemName: "chevron.left.circle.fill")
+                                .foregroundColor(.white)
+                                .font(.largeTitle)
+                        }
+                        .disabled(currentIndex == 0)
+                        
+                        Spacer()
+                        
+                        Text("\(currentIndex + 1) / \(images.count)")
+                            .foregroundColor(.white)
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 6)
+                            .background(Color.black.opacity(0.6))
+                            .cornerRadius(12)
+                        
+                        Spacer()
+                        
+                        Button(action: { withAnimation { currentIndex = min(images.count - 1, currentIndex + 1) } }) {
+                            Image(systemName: "chevron.right.circle.fill")
+                                .foregroundColor(.white)
+                                .font(.largeTitle)
+                        }
+                        .disabled(currentIndex == images.count - 1)
+                    }
+                    .padding()
+                }
+            }
         }
     }
 }

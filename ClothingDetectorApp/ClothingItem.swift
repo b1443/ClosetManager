@@ -8,7 +8,8 @@ struct ClothingItem: Identifiable, Codable {
     let material: ClothingMaterial
     let color: String
     let dateAdded: Date
-    let imageData: Data?
+    let frontImageData: Data?
+    let backImageData: Data?
     
     // Additional garment information
     let brand: String?
@@ -22,16 +23,43 @@ struct ClothingItem: Identifiable, Codable {
     let condition: Condition
     let tags: [String]
     
+    // Computed properties for images
+    var frontImage: UIImage? {
+        guard let frontImageData = frontImageData else { return nil }
+        return UIImage(data: frontImageData)
+    }
+    
+    var backImage: UIImage? {
+        guard let backImageData = backImageData else { return nil }
+        return UIImage(data: backImageData)
+    }
+    
+    // Legacy support - returns front image for backward compatibility
     var image: UIImage? {
-        guard let imageData = imageData else { return nil }
-        return UIImage(data: imageData)
+        return frontImage
+    }
+    
+    // Legacy support - returns front image data for backward compatibility  
+    var imageData: Data? {
+        return frontImageData
+    }
+    
+    // Helper to check if item has any images
+    var hasImages: Bool {
+        return frontImageData != nil || backImageData != nil
+    }
+    
+    // Helper to check if item has both images
+    var hasBothImages: Bool {
+        return frontImageData != nil && backImageData != nil
     }
     
     init(name: String, 
          type: ClothingType, 
          material: ClothingMaterial, 
          color: String, 
-         image: UIImage? = nil,
+         frontImage: UIImage? = nil,
+         backImage: UIImage? = nil,
          brand: String? = nil,
          size: ClothingSize? = nil,
          purchasePrice: Double? = nil,
@@ -47,7 +75,8 @@ struct ClothingItem: Identifiable, Codable {
         self.material = material
         self.color = color
         self.dateAdded = Date()
-        self.imageData = image?.jpegData(compressionQuality: 0.8)
+        self.frontImageData = frontImage?.jpegData(compressionQuality: 0.8)
+        self.backImageData = backImage?.jpegData(compressionQuality: 0.8)
         
         self.brand = brand
         self.size = size
@@ -59,6 +88,42 @@ struct ClothingItem: Identifiable, Codable {
         self.notes = notes
         self.condition = condition
         self.tags = tags
+    }
+    
+    // Convenience initializer for backward compatibility with single image
+    init(name: String, 
+         type: ClothingType, 
+         material: ClothingMaterial, 
+         color: String, 
+         image: UIImage? = nil,
+         brand: String? = nil,
+         size: ClothingSize? = nil,
+         purchasePrice: Double? = nil,
+         purchaseDate: Date? = nil,
+         store: String? = nil,
+         season: Season? = nil,
+         occasion: Occasion? = nil,
+         notes: String? = nil,
+         condition: Condition = .good,
+         tags: [String] = []) {
+        self.init(
+            name: name,
+            type: type,
+            material: material,
+            color: color,
+            frontImage: image,
+            backImage: nil,
+            brand: brand,
+            size: size,
+            purchasePrice: purchasePrice,
+            purchaseDate: purchaseDate,
+            store: store,
+            season: season,
+            occasion: occasion,
+            notes: notes,
+            condition: condition,
+            tags: tags
+        )
     }
 }
 
