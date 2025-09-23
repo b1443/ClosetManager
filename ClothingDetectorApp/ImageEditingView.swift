@@ -15,6 +15,8 @@ struct ImageEditingView: View {
     @State private var cropScale: CGFloat = 1.0
     @State private var showingCropView = false
     @State private var isProcessing = false
+    @State private var isFlippedHorizontally = false
+    @State private var isFlippedVertically = false
     
     // Crop-related states
     @State private var cropRect = CGRect(x: 0.1, y: 0.1, width: 0.8, height: 0.8)
@@ -49,6 +51,7 @@ struct ImageEditingView: View {
                                 .aspectRatio(contentMode: .fit)
                                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                                 .rotationEffect(.degrees(rotationAngle))
+                                .scaleEffect(x: isFlippedHorizontally ? -1 : 1, y: isFlippedVertically ? -1 : 1)
                                 .brightness(brightness)
                                 .contrast(contrast)
                                 .saturation(saturation)
@@ -71,9 +74,10 @@ struct ImageEditingView: View {
                 // Editing Tools
                 ScrollView {
                     LazyVStack(spacing: 20) {
-                        // Rotate Section
-                        EditingSectionView(title: "Rotate", icon: "rotate.right") {
-                            VStack {
+                        // Rotate & Flip Section
+                        EditingSectionView(title: "Transform", icon: "rotate.right") {
+                            VStack(spacing: 12) {
+                                // Rotation Controls
                                 HStack {
                                     Button("↺ 90°") {
                                         withAnimation(.easeInOut(duration: 0.3)) {
@@ -103,6 +107,27 @@ struct ImageEditingView: View {
                                 }
                                 .onChange(of: rotationAngle) { _, _ in
                                     applyAllEdits()
+                                }
+                                
+                                // Flip Controls
+                                HStack {
+                                    Button("⇄ Flip H") {
+                                        withAnimation(.easeInOut(duration: 0.3)) {
+                                            isFlippedHorizontally.toggle()
+                                        }
+                                        applyAllEdits()
+                                    }
+                                    .buttonStyle(EditingButtonStyle(color: isFlippedHorizontally ? .purple : .gray))
+                                    
+                                    Spacer()
+                                    
+                                    Button("⇅ Flip V") {
+                                        withAnimation(.easeInOut(duration: 0.3)) {
+                                            isFlippedVertically.toggle()
+                                        }
+                                        applyAllEdits()
+                                    }
+                                    .buttonStyle(EditingButtonStyle(color: isFlippedVertically ? .purple : .gray))
                                 }
                             }
                         }
@@ -205,49 +230,61 @@ struct ImageEditingView: View {
     
     private func applyAllEdits() {
         guard !isProcessing else { return }
-        
         isProcessing = true
         
-        DispatchQueue.global(qos: .userInitiated).async {
-            let editedImage = self.processImage(self.originalImage)
-            
-            DispatchQueue.main.async {
+        Task {
+            let editedImage = await processImageAsync()
+            await MainActor.run {
                 self.currentImage = editedImage
                 self.isProcessing = false
             }
         }
     }
     
-    private func processImage(_ image: UIImage) -> UIImage {
-        guard let ciImage = CIImage(image: image) else { return image }
-        
-        var processedImage = ciImage
-        
-        // Apply filters
-        if let brightnessFilter = CIFilter(name: "CIColorControls") {
-            brightnessFilter.setValue(processedImage, forKey: kCIInputImageKey)
-            brightnessFilter.setValue(brightness, forKey: kCIInputBrightnessKey)
-            brightnessFilter.setValue(contrast, forKey: kCIInputContrastKey)
-            brightnessFilter.setValue(saturation, forKey: kCIInputSaturationKey)
-            
-            if let outputImage = brightnessFilter.outputImage {
-                processedImage = outputImage
+    private static let sharedContext = CIContext(options: [.useSoftwareRenderer: false])
+    
+    private func processImageAsync() async -> UIImage {
+        return await withCheckedContinuation { continuation in
+            DispatchQueue.global(qos: .userInitiated).async {
+                guard let ciImage = CIImage(image: self.originalImage) else {
+                    continuation.resume(returning: self.originalImage)
+                    return
+                }
+                
+                var processedImage = ciImage
+                
+                // Combine all filters into one operation
+                if brightness != 0 || contrast != 1 || saturation != 1 {
+                    processedImage = processedImage.applyingFilter("CIColorControls", parameters: [
+                        kCIInputBrightnessKey: self.brightness,
+                        kCIInputContrastKey: self.contrast,
+                        kCIInputSaturationKey: self.saturation
+                    ])
+                }
+                
+                // Apply transformations in one operation
+                var transform = CGAffineTransform.identity
+                if self.rotationAngle != 0 {
+                    transform = transform.rotated(by: self.rotationAngle * .pi / 180)
+                }
+                if self.isFlippedHorizontally {
+                    transform = transform.scaledBy(x: -1, y: 1)
+                }
+                if self.isFlippedVertically {
+                    transform = transform.scaledBy(x: 1, y: -1)
+                }
+                if !transform.isIdentity {
+                    processedImage = processedImage.transformed(by: transform)
+                }
+                
+                guard let cgImage = Self.sharedContext.createCGImage(processedImage, from: processedImage.extent) else {
+                    continuation.resume(returning: self.originalImage)
+                    return
+                }
+                
+                continuation.resume(returning: UIImage(cgImage: cgImage))
             }
         }
-        
-        // Apply rotation
-        if rotationAngle != 0 {
-            let radians = rotationAngle * .pi / 180
-            processedImage = processedImage.transformed(by: CGAffineTransform(rotationAngle: radians))
-        }
-        
-        // Convert back to UIImage
-        let context = CIContext()
-        guard let cgImage = context.createCGImage(processedImage, from: processedImage.extent) else {
-            return image
-        }
-        
-        return UIImage(cgImage: cgImage)
     }
     
     private func resetToOriginal() {
@@ -256,8 +293,11 @@ struct ImageEditingView: View {
             brightness = 0
             contrast = 1
             saturation = 1
+            isFlippedHorizontally = false
+            isFlippedVertically = false
             currentImage = originalImage
         }
+        applyAllEdits()
     }
 }
 
@@ -267,52 +307,102 @@ struct CropView: View {
     let onCropComplete: (UIImage) -> Void
     
     @State private var dragOffset = CGSize.zero
-    @State private var lastDragValue = CGSize.zero
-    @State private var scale: CGFloat = 1.0
-    @State private var lastScale: CGFloat = 1.0
+    @State private var isDragging = false
+    @State private var imageSize: CGSize = .zero
     
     var body: some View {
         GeometryReader { geometry in
             ZStack {
+                Color.black.ignoresSafeArea()
+                
                 // Background image
                 Image(uiImage: image)
                     .resizable()
                     .aspectRatio(contentMode: .fit)
-                    .frame(width: geometry.size.width, height: geometry.size.height)
-                
-                // Crop overlay
-                Rectangle()
-                    .stroke(Color.blue, lineWidth: 2)
+                    .frame(maxWidth: geometry.size.width, maxHeight: geometry.size.height)
                     .background(
-                        Rectangle()
-                            .fill(Color.clear)
-                            .border(Color.blue, width: 2)
+                        GeometryReader { imageGeometry in
+                            Color.clear.onAppear {
+                                imageSize = imageGeometry.size
+                            }
+                        }
                     )
-                    .frame(
-                        width: geometry.size.width * cropRect.width,
-                        height: geometry.size.height * cropRect.height
-                    )
-                    .position(
-                        x: geometry.size.width * (cropRect.minX + cropRect.width / 2),
-                        y: geometry.size.height * (cropRect.minY + cropRect.height / 2)
-                    )
-                    .gesture(
-                        DragGesture()
-                            .onChanged { value in
-                                let newX = cropRect.minX + (value.translation.width - lastDragValue.width) / geometry.size.width
-                                let newY = cropRect.minY + (value.translation.height - lastDragValue.height) / geometry.size.height
-                                
-                                cropRect = CGRect(
-                                    x: max(0, min(1 - cropRect.width, newX)),
-                                    y: max(0, min(1 - cropRect.height, newY)),
-                                    width: cropRect.width,
-                                    height: cropRect.height
+                
+                // Crop overlay with semi-transparent background
+                ZStack {
+                    // Dark overlay
+                    Color.black.opacity(0.6)
+                        .mask(
+                            Rectangle()
+                                .fill(Color.black)
+                                .overlay(
+                                    Rectangle()
+                                        .frame(
+                                            width: imageSize.width * cropRect.width,
+                                            height: imageSize.height * cropRect.height
+                                        )
+                                        .position(
+                                            x: imageSize.width * (cropRect.minX + cropRect.width / 2),
+                                            y: imageSize.height * (cropRect.minY + cropRect.height / 2)
+                                        )
+                                        .blendMode(.destinationOut)
                                 )
-                            }
-                            .onEnded { value in
-                                lastDragValue = value.translation
-                            }
-                    )
+                        )
+                    
+                    // Crop rectangle
+                    Rectangle()
+                        .stroke(Color.white, lineWidth: 3)
+                        .background(
+                            Rectangle()
+                                .stroke(Color.blue, lineWidth: 1)
+                                .background(Color.clear)
+                        )
+                        .frame(
+                            width: imageSize.width * cropRect.width,
+                            height: imageSize.height * cropRect.height
+                        )
+                        .position(
+                            x: imageSize.width * (cropRect.minX + cropRect.width / 2),
+                            y: imageSize.height * (cropRect.minY + cropRect.height / 2)
+                        )
+                        .scaleEffect(isDragging ? 1.05 : 1.0)
+                        .animation(.easeInOut(duration: 0.2), value: isDragging)
+                        .gesture(
+                            DragGesture()
+                                .onChanged { value in
+                                    isDragging = true
+                                    let deltaX = value.translation.width / imageSize.width
+                                    let deltaY = value.translation.height / imageSize.height
+                                    
+                                    let newX = max(0, min(1 - cropRect.width, cropRect.minX + deltaX))
+                                    let newY = max(0, min(1 - cropRect.height, cropRect.minY + deltaY))
+                                    
+                                    cropRect = CGRect(
+                                        x: newX,
+                                        y: newY,
+                                        width: cropRect.width,
+                                        height: cropRect.height
+                                    )
+                                }
+                                .onEnded { _ in
+                                    isDragging = false
+                                }
+                        )
+                    
+                    // Corner handles for resizing
+                    ForEach(0..<4, id: \.self) { corner in
+                        Circle()
+                            .fill(Color.white)
+                            .frame(width: 20, height: 20)
+                            .position(cornerPosition(for: corner))
+                            .gesture(
+                                DragGesture()
+                                    .onChanged { value in
+                                        resizeCropRect(corner: corner, translation: value.translation)
+                                    }
+                            )
+                    }
+                }
                 
                 // Crop controls
                 VStack {
@@ -342,23 +432,85 @@ struct CropView: View {
         }
     }
     
-    private func cropImage() {
-        let renderer = UIGraphicsImageRenderer(size: CGSize(
-            width: image.size.width * cropRect.width,
-            height: image.size.height * cropRect.height
-        ))
+    private func cornerPosition(for corner: Int) -> CGPoint {
+        let rect = CGRect(
+            x: imageSize.width * cropRect.minX,
+            y: imageSize.height * cropRect.minY,
+            width: imageSize.width * cropRect.width,
+            height: imageSize.height * cropRect.height
+        )
         
-        let croppedImage = renderer.image { context in
-            let drawRect = CGRect(
-                x: -image.size.width * cropRect.minX,
-                y: -image.size.height * cropRect.minY,
-                width: image.size.width,
-                height: image.size.height
-            )
-            image.draw(in: drawRect)
+        switch corner {
+        case 0: // Top-left
+            return CGPoint(x: rect.minX, y: rect.minY)
+        case 1: // Top-right
+            return CGPoint(x: rect.maxX, y: rect.minY)
+        case 2: // Bottom-left
+            return CGPoint(x: rect.minX, y: rect.maxY)
+        case 3: // Bottom-right
+            return CGPoint(x: rect.maxX, y: rect.maxY)
+        default:
+            return .zero
+        }
+    }
+    
+    private func resizeCropRect(corner: Int, translation: CGSize) {
+        let minSize: CGFloat = 0.1 // Minimum 10% of image size
+        let deltaX = translation.width / imageSize.width
+        let deltaY = translation.height / imageSize.height
+        
+        var newRect = cropRect
+        
+        switch corner {
+        case 0: // Top-left
+            newRect.origin.x = min(cropRect.maxX - minSize, cropRect.minX + deltaX)
+            newRect.origin.y = min(cropRect.maxY - minSize, cropRect.minY + deltaY)
+            newRect.size.width = cropRect.maxX - newRect.minX
+            newRect.size.height = cropRect.maxY - newRect.minY
+        case 1: // Top-right
+            newRect.origin.y = min(cropRect.maxY - minSize, cropRect.minY + deltaY)
+            newRect.size.width = max(minSize, cropRect.width + deltaX)
+            newRect.size.height = cropRect.maxY - newRect.minY
+        case 2: // Bottom-left
+            newRect.origin.x = min(cropRect.maxX - minSize, cropRect.minX + deltaX)
+            newRect.size.width = cropRect.maxX - newRect.minX
+            newRect.size.height = max(minSize, cropRect.height + deltaY)
+        case 3: // Bottom-right
+            newRect.size.width = max(minSize, cropRect.width + deltaX)
+            newRect.size.height = max(minSize, cropRect.height + deltaY)
+        default:
+            break
         }
         
-        onCropComplete(croppedImage)
+        // Ensure the crop rect stays within bounds
+        newRect.origin.x = max(0, newRect.origin.x)
+        newRect.origin.y = max(0, newRect.origin.y)
+        newRect.size.width = min(1 - newRect.origin.x, newRect.size.width)
+        newRect.size.height = min(1 - newRect.origin.y, newRect.size.height)
+        
+        cropRect = newRect
+    }
+    
+    private func cropImage() {
+        guard let cgImage = image.cgImage else {
+            onCropComplete(image)
+            return
+        }
+        
+        let scale = image.scale
+        let cropFrame = CGRect(
+            x: CGFloat(cgImage.width) * cropRect.minX * scale,
+            y: CGFloat(cgImage.height) * cropRect.minY * scale,
+            width: CGFloat(cgImage.width) * cropRect.width * scale,
+            height: CGFloat(cgImage.height) * cropRect.height * scale
+        )
+        
+        guard let croppedCGImage = cgImage.cropping(to: cropFrame) else {
+            onCropComplete(image)
+            return
+        }
+        
+        onCropComplete(UIImage(cgImage: croppedCGImage, scale: scale, orientation: image.imageOrientation))
     }
 }
 

@@ -1,71 +1,140 @@
 import SwiftUI
 import UIKit
 
+class ItemFormData: ObservableObject {
+    @Published var customItemName = ""
+    @Published var selectedType: ClothingType = .unknown
+    @Published var selectedMaterial: ClothingMaterial = .unknown
+    @Published var selectedColor = ""
+    @Published var selectedBrand = ""
+    @Published var selectedSize: ClothingSize? = nil
+    @Published var purchasePrice = ""
+    @Published var purchaseDate = Date()
+    @Published var selectedStore = ""
+    @Published var selectedSeason: Season? = nil
+    @Published var selectedOccasion: Occasion? = nil
+    @Published var notes = ""
+    @Published var selectedCondition: Condition = .good
+    @Published var tags = ""
+    
+    func reset() {
+        customItemName = ""
+        selectedType = .unknown
+        selectedMaterial = .unknown
+        selectedColor = ""
+        selectedBrand = ""
+        selectedSize = nil
+        purchasePrice = ""
+        purchaseDate = Date()
+        selectedStore = ""
+        selectedSeason = nil
+        selectedOccasion = nil
+        notes = ""
+        selectedCondition = .good
+        tags = ""
+    }
+    
+    func setupFrom(result: ClothingDetectionResult) {
+        customItemName = "\(result.color) \(result.material.rawValue) \(result.type.rawValue)"
+        selectedType = result.type
+        selectedMaterial = result.material
+        selectedColor = result.color
+    }
+}
+
 struct CameraView: View {
     @EnvironmentObject var closetManager: ClosetManager
     @StateObject private var clothingDetector = ClothingDetector()
     
+    // Core image state
     @State private var selectedImage: UIImage?
     @State private var frontImage: UIImage?
     @State private var backImage: UIImage?
+    @State private var detectionResult: ClothingDetectionResult?
+    @State private var isAnalyzing = false
+    
+    // UI state
     @State private var showingCameraPicker = false
     @State private var showingPhotoLibraryPicker = false
     @State private var showingDualImageCapture = false
-    @State private var detectionResult: ClothingDetectionResult?
-    @State private var isAnalyzing = false
     @State private var showingAddItemSheet = false
-    @State private var customItemName = ""
-    @State private var selectedType: ClothingType = .unknown
-    @State private var selectedMaterial: ClothingMaterial = .unknown
-    @State private var selectedColor = ""
-    
-    // Additional garment information
-    @State private var selectedBrand = ""
-    @State private var selectedSize: ClothingSize? = nil
-    @State private var purchasePrice = ""
-    @State private var purchaseDate = Date()
-    @State private var selectedStore = ""
-    @State private var selectedSeason: Season? = nil
-    @State private var selectedOccasion: Occasion? = nil
-    @State private var notes = ""
-    @State private var selectedCondition: Condition = .good
-    @State private var tags = ""
-    
-    @State private var errorMessage: String?
+    @State private var showingImageEditor = false
     @State private var showingError = false
     
+    // Form data - consolidated into a single state object would be better
+    @StateObject private var itemForm = ItemFormData()
     
-    var body: some View {
-        NavigationView {
-            ScrollView {
-                VStack(spacing: 20) {
-                    HeaderView()
-                    ImageDisplayView(selectedImage: selectedImage, isAnalyzing: isAnalyzing)
+    // Error handling
+    @State private var errorMessage: String?
+    @State private var imageToEdit: UIImage?
+    @State private var editedImage: UIImage?
+    
+    private var content: some View {
+        ScrollView {
+            VStack(spacing: 20) {
+                HeaderView()
+                ImageDisplayView(selectedImage: selectedImage, isAnalyzing: isAnalyzing)
+            
+                ActionButtonsView(
+                    showingDualImageCapture: $showingDualImageCapture,
+                    showingCameraPicker: $showingCameraPicker,
+                    showingPhotoLibraryPicker: $showingPhotoLibraryPicker
+                )
                 
-                    ActionButtonsView(
-                        showingDualImageCapture: $showingDualImageCapture,
-                        showingCameraPicker: $showingCameraPicker,
-                        showingPhotoLibraryPicker: $showingPhotoLibraryPicker
-                    )
+                editImageButton
                 
-                    if let result = detectionResult {
-                        DetectionResultsView(result: result)
-                    }
-                
-                    if frontImage != nil || backImage != nil {
-                        DualImagesDisplayView(frontImage: frontImage, backImage: backImage)
-                    }
-                
-                    if (selectedImage != nil && detectionResult != nil) || frontImage != nil {
-                        AddToClosetButton {
-                            setupAddItemSheet()
-                            showingAddItemSheet = true
-                        }
+                if let result = detectionResult {
+                    DetectionResultsView(result: result)
+                }
+            
+                if frontImage != nil || backImage != nil {
+                    DualImagesDisplayView(frontImage: frontImage, backImage: backImage)
+                }
+            
+                if shouldShowAddButton {
+                    AddToClosetButton {
+                        setupAddItemSheet()
+                        showingAddItemSheet = true
                     }
                 }
             }
-            .navigationTitle("Camera")
-            .navigationBarTitleDisplayMode(.inline)
+        }
+    }
+    
+    @ViewBuilder
+    private var editImageButton: some View {
+        if selectedImage != nil && detectionResult == nil && !isAnalyzing {
+            Button(action: {
+                imageToEdit = selectedImage
+                showingImageEditor = true
+            }) {
+                HStack {
+                    Image(systemName: "slider.horizontal.3")
+                        .font(.title2)
+                    Text("Edit Image")
+                        .font(.headline)
+                        .fontWeight(.semibold)
+                }
+                .frame(maxWidth: .infinity)
+                .padding()
+                .background(Color.orange)
+                .foregroundColor(.white)
+                .cornerRadius(12)
+            }
+            .padding(.horizontal)
+            .transition(.scale.combined(with: .opacity))
+        }
+    }
+    
+    private var shouldShowAddButton: Bool {
+        (selectedImage != nil && detectionResult != nil) || frontImage != nil
+    }
+    
+    var body: some View {
+        NavigationView {
+            content
+                .navigationTitle("Camera")
+                .navigationBarTitleDisplayMode(.inline)
         }
         .sheet(isPresented: $showingCameraPicker) {
             ImagePicker(selectedImage: $selectedImage, sourceType: .camera)
@@ -84,26 +153,28 @@ struct CameraView: View {
                 image: selectedImage,
                 frontImage: frontImage,
                 backImage: backImage,
-                detectionResult: detectionResult,
-                customItemName: $customItemName,
-                selectedType: $selectedType,
-                selectedMaterial: $selectedMaterial,
-                selectedColor: $selectedColor,
-                selectedBrand: $selectedBrand,
-                selectedSize: $selectedSize,
-                purchasePrice: $purchasePrice,
-                purchaseDate: $purchaseDate,
-                selectedStore: $selectedStore,
-                selectedSeason: $selectedSeason,
-                selectedOccasion: $selectedOccasion,
-                notes: $notes,
-                selectedCondition: $selectedCondition,
-                tags: $tags,
+                formData: itemForm,
                 onSave: { item in
                     closetManager.addClothingItem(item)
                     resetForm()
                 }
             )
+        }
+        .sheet(isPresented: $showingImageEditor) {
+            if let imageToEdit = imageToEdit {
+                ImageEditingViewWrapper(
+                    originalImage: imageToEdit,
+                    onComplete: { edited in
+                        if let edited = edited {
+                            selectedImage = edited
+                            analyzeImage(edited)
+                        }
+                        showingImageEditor = false
+                        self.imageToEdit = nil
+                        editedImage = nil
+                    }
+                )
+            }
         }
         .onChange(of: selectedImage) { oldValue, newValue in
             if let newValue = newValue {
@@ -177,11 +248,7 @@ struct CameraView: View {
     
     private func setupAddItemSheet() {
         guard let result = detectionResult else { return }
-        
-        customItemName = "\(result.color) \(result.material.rawValue) \(result.type.rawValue)"
-        selectedType = result.type
-        selectedMaterial = result.material
-        selectedColor = result.color
+        itemForm.setupFrom(result: result)
     }
     
     private func resetForm() {
@@ -189,22 +256,7 @@ struct CameraView: View {
         frontImage = nil
         backImage = nil
         detectionResult = nil
-        customItemName = ""
-        selectedType = .unknown
-        selectedMaterial = .unknown
-        selectedColor = ""
-        
-        // Reset additional fields
-        selectedBrand = ""
-        selectedSize = nil
-        purchasePrice = ""
-        purchaseDate = Date()
-        selectedStore = ""
-        selectedSeason = nil
-        selectedOccasion = nil
-        notes = ""
-        selectedCondition = .good
-        tags = ""
+        itemForm.reset()
     }
 }
 
@@ -212,24 +264,7 @@ struct AddItemSheet: View {
     let image: UIImage?
     let frontImage: UIImage?
     let backImage: UIImage?
-    let detectionResult: ClothingDetectionResult?
-    
-    @Binding var customItemName: String
-    @Binding var selectedType: ClothingType
-    @Binding var selectedMaterial: ClothingMaterial
-    @Binding var selectedColor: String
-    
-    // Additional fields
-    @Binding var selectedBrand: String
-    @Binding var selectedSize: ClothingSize?
-    @Binding var purchasePrice: String
-    @Binding var purchaseDate: Date
-    @Binding var selectedStore: String
-    @Binding var selectedSeason: Season?
-    @Binding var selectedOccasion: Occasion?
-    @Binding var notes: String
-    @Binding var selectedCondition: Condition
-    @Binding var tags: String
+    @ObservedObject var formData: ItemFormData
     
     let onSave: (ClothingItem) -> Void
     
@@ -240,31 +275,31 @@ struct AddItemSheet: View {
             Form {
                 // Basic Information
                 Section(header: Text("Basic Information")) {
-                    TextField("Item Name", text: $customItemName)
+                    TextField("Item Name", text: $formData.customItemName)
                         .textFieldStyle(RoundedBorderTextFieldStyle())
                     
-                    Picker("Type", selection: $selectedType) {
+                    Picker("Type", selection: $formData.selectedType) {
                         ForEach(ClothingType.allCases, id: \.self) { type in
                             Text("\(type.icon) \(type.rawValue)").tag(type)
                         }
                     }
                     
-                    Picker("Material", selection: $selectedMaterial) {
+                    Picker("Material", selection: $formData.selectedMaterial) {
                         ForEach(ClothingMaterial.allCases, id: \.self) { material in
                             Text(material.rawValue).tag(material)
                         }
                     }
                     
-                    TextField("Color", text: $selectedColor)
+                    TextField("Color", text: $formData.selectedColor)
                         .textFieldStyle(RoundedBorderTextFieldStyle())
                 }
                 
                 // Brand & Size
                 Section(header: Text("Brand & Size")) {
-                    TextField("Brand (optional)", text: $selectedBrand)
+                    TextField("Brand (optional)", text: $formData.selectedBrand)
                         .textFieldStyle(RoundedBorderTextFieldStyle())
                     
-                    Picker("Size", selection: $selectedSize) {
+                    Picker("Size", selection: $formData.selectedSize) {
                         Text("Not Specified").tag(nil as ClothingSize?)
                         ForEach(ClothingSize.allCases, id: \.self) { size in
                             Text(size.rawValue).tag(size as ClothingSize?)
@@ -274,33 +309,33 @@ struct AddItemSheet: View {
                 
                 // Purchase Information
                 Section(header: Text("Purchase Information")) {
-                    TextField("Price (optional)", text: $purchasePrice)
+                    TextField("Price (optional)", text: $formData.purchasePrice)
                         .textFieldStyle(RoundedBorderTextFieldStyle())
                         .keyboardType(.decimalPad)
                     
-                    DatePicker("Purchase Date", selection: $purchaseDate, displayedComponents: .date)
+                    DatePicker("Purchase Date", selection: $formData.purchaseDate, displayedComponents: .date)
                     
-                    TextField("Store (optional)", text: $selectedStore)
+                    TextField("Store (optional)", text: $formData.selectedStore)
                         .textFieldStyle(RoundedBorderTextFieldStyle())
                 }
                 
                 // Category & Usage
                 Section(header: Text("Category & Usage")) {
-                    Picker("Season", selection: $selectedSeason) {
+                    Picker("Season", selection: $formData.selectedSeason) {
                         Text("Not Specified").tag(nil as Season?)
                         ForEach(Season.allCases, id: \.self) { season in
                             Text("\(season.icon) \(season.rawValue)").tag(season as Season?)
                         }
                     }
                     
-                    Picker("Occasion", selection: $selectedOccasion) {
+                    Picker("Occasion", selection: $formData.selectedOccasion) {
                         Text("Not Specified").tag(nil as Occasion?)
                         ForEach(Occasion.allCases, id: \.self) { occasion in
                             Text("\(occasion.icon) \(occasion.rawValue)").tag(occasion as Occasion?)
                         }
                     }
                     
-                    Picker("Condition", selection: $selectedCondition) {
+                    Picker("Condition", selection: $formData.selectedCondition) {
                         ForEach(Condition.allCases, id: \.self) { condition in
                             Text("\(condition.icon) \(condition.rawValue)").tag(condition)
                         }
@@ -309,11 +344,11 @@ struct AddItemSheet: View {
                 
                 // Notes & Tags
                 Section(header: Text("Notes & Tags")) {
-                    TextField("Notes (optional)", text: $notes, axis: .vertical)
+                    TextField("Notes (optional)", text: $formData.notes, axis: .vertical)
                         .textFieldStyle(RoundedBorderTextFieldStyle())
                         .lineLimit(3...6)
                     
-                    TextField("Tags (comma-separated)", text: $tags)
+                    TextField("Tags (comma-separated)", text: $formData.tags)
                         .textFieldStyle(RoundedBorderTextFieldStyle())
                         .help("Example: work, casual, favorite")
                 }
@@ -347,33 +382,37 @@ struct AddItemSheet: View {
                     presentationMode.wrappedValue.dismiss()
                 },
                 trailing: Button("Save") {
-                    let priceValue = Double(purchasePrice.isEmpty ? "0" : purchasePrice)
-                    let tagsArray = tags.split(separator: ",").map { $0.trimmingCharacters(in: .whitespaces) }
-                    
-                    let item = ClothingItem(
-                        name: customItemName.isEmpty ? "Untitled Item" : customItemName,
-                        type: selectedType,
-                        material: selectedMaterial,
-                        color: selectedColor.isEmpty ? "Unknown" : selectedColor,
-                        frontImage: frontImage ?? image,
-                        backImage: backImage,
-                        brand: selectedBrand.isEmpty ? nil : selectedBrand,
-                        size: selectedSize,
-                        purchasePrice: priceValue,
-                        purchaseDate: purchaseDate,
-                        store: selectedStore.isEmpty ? nil : selectedStore,
-                        season: selectedSeason,
-                        occasion: selectedOccasion,
-                        notes: notes.isEmpty ? nil : notes,
-                        condition: selectedCondition,
-                        tags: tagsArray
-                    )
+                    let item = createClothingItem()
                     onSave(item)
                     presentationMode.wrappedValue.dismiss()
                 }
-                .disabled(customItemName.isEmpty)
+                .disabled(formData.customItemName.isEmpty)
             )
         }
+    }
+    
+    private func createClothingItem() -> ClothingItem {
+        let priceValue = Double(formData.purchasePrice) ?? 0
+        let tagsArray = formData.tags.split(separator: ",").map { $0.trimmingCharacters(in: .whitespaces) }
+        
+        return ClothingItem(
+            name: formData.customItemName.isEmpty ? "Untitled Item" : formData.customItemName,
+            type: formData.selectedType,
+            material: formData.selectedMaterial,
+            color: formData.selectedColor.isEmpty ? "Unknown" : formData.selectedColor,
+            frontImage: frontImage ?? image,
+            backImage: backImage,
+            brand: formData.selectedBrand.isEmpty ? nil : formData.selectedBrand,
+            size: formData.selectedSize,
+            purchasePrice: priceValue,
+            purchaseDate: formData.purchaseDate,
+            store: formData.selectedStore.isEmpty ? nil : formData.selectedStore,
+            season: formData.selectedSeason,
+            occasion: formData.selectedOccasion,
+            notes: formData.notes.isEmpty ? nil : formData.notes,
+            condition: formData.selectedCondition,
+            tags: tagsArray
+        )
     }
 }
 
@@ -718,6 +757,32 @@ struct AddToClosetButton: View {
                 .cornerRadius(10)
         }
         .padding(.horizontal)
+    }
+}
+
+struct ImageEditingViewWrapper: View {
+    let originalImage: UIImage
+    let onComplete: (UIImage?) -> Void
+    
+    @State private var workingImage: UIImage
+    @State private var editedResult: UIImage
+    
+    init(originalImage: UIImage, onComplete: @escaping (UIImage?) -> Void) {
+        self.originalImage = originalImage
+        self.onComplete = onComplete
+        self._workingImage = State(initialValue: originalImage)
+        self._editedResult = State(initialValue: originalImage)
+    }
+    
+    var body: some View {
+        ImageEditingView(
+            originalImage: $workingImage,
+            editedImage: $editedResult
+        )
+        .onDisappear {
+            // When the editing view is dismissed, pass back the result
+            onComplete(editedResult != originalImage ? editedResult : nil)
+        }
     }
 }
 

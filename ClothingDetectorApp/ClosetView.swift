@@ -40,88 +40,36 @@ struct ClosetView: View {
     }
     
     var filteredAndSortedItems: [ClothingItem] {
-        var items = closetManager.clothingItems
+        let items = searchText.isEmpty ? closetManager.clothingItems : closetManager.searchClothingItems(query: searchText)
+        return items.filter(matchesFilters).sorted(by: sortComparator)
+    }
+    
+    private func matchesFilters(_ item: ClothingItem) -> Bool {
+        guard selectedTypeFilter == nil || item.type == selectedTypeFilter else { return false }
+        guard selectedMaterialFilter == nil || item.material == selectedMaterialFilter else { return false }
+        guard selectedColorFilter == nil || item.color.localizedCaseInsensitiveContains(selectedColorFilter!) else { return false }
+        guard selectedSeasonFilter == nil || item.season == selectedSeasonFilter else { return false }
+        guard selectedOccasionFilter == nil || item.occasion == selectedOccasionFilter else { return false }
+        guard selectedConditionFilter == nil || item.condition == selectedConditionFilter else { return false }
+        guard selectedBrandFilter == nil || item.brand?.localizedCaseInsensitiveCompare(selectedBrandFilter!) == .orderedSame else { return false }
         
-        // Apply text search first
-        if !searchText.isEmpty {
-            items = closetManager.searchClothingItems(query: searchText)
-        }
+        if let minPrice = priceRangeMin, let itemPrice = item.purchasePrice, itemPrice < minPrice { return false }
+        if let maxPrice = priceRangeMax, let itemPrice = item.purchasePrice, itemPrice > maxPrice { return false }
         
-        // Apply filters
-        items = items.filter { item in
-            // Type filter
-            if let typeFilter = selectedTypeFilter, item.type != typeFilter {
-                return false
-            }
-            
-            // Material filter
-            if let materialFilter = selectedMaterialFilter, item.material != materialFilter {
-                return false
-            }
-            
-            // Color filter
-            if let colorFilter = selectedColorFilter, !item.color.lowercased().contains(colorFilter.lowercased()) {
-                return false
-            }
-            
-            // Season filter
-            if let seasonFilter = selectedSeasonFilter, item.season != seasonFilter {
-                return false
-            }
-            
-            // Occasion filter
-            if let occasionFilter = selectedOccasionFilter, item.occasion != occasionFilter {
-                return false
-            }
-            
-            // Condition filter
-            if let conditionFilter = selectedConditionFilter, item.condition != conditionFilter {
-                return false
-            }
-            
-            // Brand filter
-            if let brandFilter = selectedBrandFilter, item.brand?.lowercased() != brandFilter.lowercased() {
-                return false
-            }
-            
-            // Price range filter
-            if let minPrice = priceRangeMin, let itemPrice = item.purchasePrice, itemPrice < minPrice {
-                return false
-            }
-            if let maxPrice = priceRangeMax, let itemPrice = item.purchasePrice, itemPrice > maxPrice {
-                return false
-            }
-            
-            return true
+        return true
+    }
+    
+    private func sortComparator(_ item1: ClothingItem, _ item2: ClothingItem) -> Bool {
+        let result = switch selectedSortOption {
+        case .name: item1.name.localizedCaseInsensitiveCompare(item2.name) == .orderedAscending
+        case .dateAdded: item1.dateAdded < item2.dateAdded
+        case .type: item1.type.rawValue.localizedCaseInsensitiveCompare(item2.type.rawValue) == .orderedAscending
+        case .material: item1.material.rawValue.localizedCaseInsensitiveCompare(item2.material.rawValue) == .orderedAscending
+        case .color: item1.color.localizedCaseInsensitiveCompare(item2.color) == .orderedAscending
+        case .price: (item1.purchasePrice ?? 0) < (item2.purchasePrice ?? 0)
+        case .brand: (item1.brand ?? "").localizedCaseInsensitiveCompare(item2.brand ?? "") == .orderedAscending
         }
-        
-        // Apply sorting
-        return items.sorted { item1, item2 in
-            let result: Bool
-            
-            switch selectedSortOption {
-            case .name:
-                result = item1.name.localizedCaseInsensitiveCompare(item2.name) == .orderedAscending
-            case .dateAdded:
-                result = item1.dateAdded < item2.dateAdded
-            case .type:
-                result = item1.type.rawValue.localizedCaseInsensitiveCompare(item2.type.rawValue) == .orderedAscending
-            case .material:
-                result = item1.material.rawValue.localizedCaseInsensitiveCompare(item2.material.rawValue) == .orderedAscending
-            case .color:
-                result = item1.color.localizedCaseInsensitiveCompare(item2.color) == .orderedAscending
-            case .price:
-                let price1 = item1.purchasePrice ?? 0
-                let price2 = item2.purchasePrice ?? 0
-                result = price1 < price2
-            case .brand:
-                let brand1 = item1.brand ?? ""
-                let brand2 = item2.brand ?? ""
-                result = brand1.localizedCaseInsensitiveCompare(brand2) == .orderedAscending
-            }
-            
-            return sortAscending ? result : !result
-        }
+        return sortAscending ? result : !result
     }
     
     var selectedItems: [ClothingItem] {
